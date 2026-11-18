@@ -23,7 +23,7 @@ class SettingsDialog:
 
         self.root = tk.Tk()
         self.root.title("Taskbar Speed Meter — Settings & Customizer")
-        dlg_w, dlg_h = 600, 650
+        dlg_w, dlg_h = 600, 680
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
         x = max(0, (sw - dlg_w) // 2)
@@ -116,6 +116,8 @@ class SettingsDialog:
                 self.colors["color_net_down"].set(t["net_down"])
                 self.colors["color_net_up"].set(t["net_up"])
                 self.colors["color_cpu"].set(t["cpu"])
+                if "color_gpu" in self.colors:
+                    self.colors["color_gpu"].set(t.get("gpu", "#50FA7B"))
                 self.colors["color_ram"].set(t["ram"])
                 self.colors["color_disk_r"].set(t["disk_r"])
                 self.colors["color_disk_w"].set(t["disk_w"])
@@ -144,6 +146,9 @@ class SettingsDialog:
                 self.var_uniform_hex.set(hex_c)
                 self.btn_uni_swatch.config(bg=hex_c)
                 self.var_uniform.set(True)
+                for k in self.colors:
+                    self.colors[k].set(hex_c)
+                self.update_color_swatches()
                 self._save_config_data()
 
         ttk.Button(f_uni, text="Pick...", command=pick_uniform_color).pack(side='left')
@@ -157,11 +162,13 @@ class SettingsDialog:
             ("color_net_down", "Download Speed (↓)"),
             ("color_net_up", "Upload Speed (↑)"),
             ("color_cpu", "CPU Usage"),
+            ("color_gpu", "iGPU / GPU Usage"),
             ("color_ram", "RAM Usage"),
             ("color_disk_r", "Disk Read (R)"),
             ("color_disk_w", "Disk Write (W)"),
             ("color_label", "Column Labels"),
             ("color_cpu_temp", "CPU Temp (Normal)"),
+            ("color_gpu_temp", "GPU Temp (Normal)"),
             ("color_temp_alert", "Alert Temp Color (Red/Black/Custom)"),
         ]
 

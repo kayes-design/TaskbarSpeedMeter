@@ -408,7 +408,8 @@ class SpeedMeterWindow:
         u_str = format_speed(self.metrics.up_speed, unit_bytes)
         ping_str = f"Ping: {self.metrics.ping_ms} ms" if self.metrics.ping_ms > 0 else "Ping: Checking..."
 
-        tip = f"Net: ↓ {d_str} ↑ {u_str} ({ping_str})\nCPU: {self.metrics.cpu_percent:.0f}%\nRAM: {self.metrics.ram_percent:.0f}% ({self.metrics.ram_used_gb:.1f}G)\nDisk: R {format_speed(self.metrics.disk_read_speed, True)} | W {format_speed(self.metrics.disk_write_speed, True)}"
+        gpu_str = f"\nGPU: {self.metrics.gpu_percent:.0f}% ({self.metrics.gpu_temp:.0f}°C)" if config.get("show_gpu", False) else ""
+        tip = f"Net: ↓ {d_str} ↑ {u_str} ({ping_str})\nCPU: {self.metrics.cpu_percent:.0f}%\nRAM: {self.metrics.ram_percent:.0f}% ({self.metrics.ram_used_gb:.1f}G){gpu_str}\nDisk: R {format_speed(self.metrics.disk_read_speed, True)} | W {format_speed(self.metrics.disk_write_speed, True)}"
         if self.tray:
             self.tray.update_tooltip(tip)
 
@@ -469,6 +470,7 @@ class SpeedMeterWindow:
         c_down = config.get_argb_color("color_net_down")
         c_up = config.get_argb_color("color_net_up")
         c_cpu = config.get_argb_color("color_cpu")
+        c_gpu = config.get_argb_color("color_gpu")
         c_ram = config.get_argb_color("color_ram")
         c_disk_r = config.get_argb_color("color_disk_r")
         c_disk_w = config.get_argb_color("color_disk_w")
@@ -552,7 +554,6 @@ class SpeedMeterWindow:
             col_w = self.col_w_gpu
             rf1 = RectF(cur_x, line1_y, col_w, row_h)
             rf2 = RectF(cur_x, line2_y, col_w, row_h)
-            c_gpu = config.get_argb_color("color_cpu")
             if show_gpu_temp:
                 g_color = c_alert if (enable_alert and self.metrics.gpu_temp >= gpu_thresh) else c_gpu_temp
                 draw_str(f"GPU {self.metrics.gpu_temp:.0f}°C", rf1, g_color, self.gp_font_label)
