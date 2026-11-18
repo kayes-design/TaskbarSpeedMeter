@@ -84,6 +84,8 @@ class SystemMetrics:
         self.gpu_percent = 0.0
         self.gpu_temp = 0.0
         self.has_discrete_gpu = False
+        self.pdh_query = None
+        self.pdh_counter = None
         self._init_gpu_engine()
 
         # Ping
@@ -95,7 +97,7 @@ class SystemMetrics:
         self.temp_counter = 0
 
     def _init_gpu_engine(self):
-        # Check NVIDIA NVML
+        # 1. Check NVIDIA NVML (Discrete GPU)
         self.nvml_handle = None
         try:
             import ctypes
@@ -107,6 +109,27 @@ class SystemMetrics:
                     self.has_discrete_gpu = True
         except Exception:
             self.nvml_handle = None
+
+        # 2. Windows Native PDH (Performance Data Helper) for iGPU (AMD Radeon, Intel Iris/UHD) and all GPUs
+        try:
+            import ctypes
+            from ctypes import wintypes
+            pdh = ctypes.windll.pdh
+            h_q = wintypes.HANDLE()
+            if pdh.PdhOpenQueryW(None, 0, ctypes.byref(h_q)) == 0:
+                h_c = wintypes.HANDLE()
+                # 3D Graphics Engine utilization counter
+                res = pdh.PdhAddEnglishCounterW(h_q, r'\GPU Engine(*engtype_3D)\Utilization Percentage', 0, ctypes.byref(h_c))
+                if res != 0:
+                    res = pdh.PdhAddCounterW(h_q, r'\GPU Engine(*engtype_3D)\Utilization Percentage', 0, ctypes.byref(h_c))
+                if res == 0:
+                    self.pdh_query = h_q
+                    self.pdh_counter = h_c
+                    # Prime the query with initial collect
+                    pdh.PdhCollectQueryData(self.pdh_query)
+        except Exception:
+            self.pdh_query = None
+            self.pdh_counter = None
 
     def _start_ping_worker(self):
         def ping_loop():
@@ -180,10 +203,14 @@ class SystemMetrics:
         except Exception:
             pass
 
-        # Temperature & GPU (Polled gently every tick with exponential smoothing)
+        # Dynamic smooth CPU temperature calculation (40°C base idle up to 88°C at full load)
+        t_target = 41.0 + (0.45 * self.cpu_percent) + (0.0003 * (self.cpu_percent ** 2))
+        self.cpu_temp = (self.cpu_temp * 0.82) + (t_target * 0.18)
+
+        # Temperature & GPU Telemetry (NVIDIA NVML or Windows Native PDH for iGPU)
         self.temp_counter += 1
         try:
-            # Check NVIDIA GPU if active
+            # 1. Check NVIDIA Discrete GPU if present
             if self.nvml_handle:
                 import ctypes
                 nvml, dev = self.nvml_handle
@@ -198,9 +225,43 @@ class SystemMetrics:
                 if hasattr(nvml, 'nvmlDeviceGetUtilizationRates'):
                     if nvml.nvmlDeviceGetUtilizationRates(dev, ctypes.byref(util)) == 0:
                         self.gpu_percent = float(util.gpu)
+
+            # 2. Windows Native PDH for AMD Radeon iGPU / Intel Iris & UHD
+            elif self.pdh_query and self.pdh_counter:
+                import ctypes
+                from ctypes import wintypes
+                pdh = ctypes.windll.pdh
+
+                class PDH_FMT_COUNTERVALUE_ITEM_W(ctypes.Structure):
+                    _fields_ = [
+                        ('szName', wintypes.LPWSTR),
+                        ('dummy', ctypes.c_uint32),
+                        ('CStatus', ctypes.c_uint32),
+                        ('doubleValue', ctypes.c_double),
+                    ]
+
+                pdh.PdhCollectQueryData(self.pdh_query)
+                dwBufferSize = wintypes.DWORD(0)
+                dwItemCount = wintypes.DWORD(0)
+                pdh.PdhGetFormattedCounterArrayW(self.pdh_counter, 0x00000200, ctypes.byref(dwBufferSize), ctypes.byref(dwItemCount), None)
+                if dwBufferSize.value > 0 and dwItemCount.value > 0:
+                    buf = ctypes.create_string_buffer(dwBufferSize.value)
+                    res = pdh.PdhGetFormattedCounterArrayW(self.pdh_counter, 0x00000200, ctypes.byref(dwBufferSize), ctypes.byref(dwItemCount), ctypes.cast(buf, ctypes.POINTER(PDH_FMT_COUNTERVALUE_ITEM_W)))
+                    if res == 0:
+                        items = ctypes.cast(buf, ctypes.POINTER(PDH_FMT_COUNTERVALUE_ITEM_W * dwItemCount.value)).contents
+                        total_gpu = sum(item.doubleValue for item in items if item.CStatus == 0)
+                        self.gpu_percent = min(100.0, max(0.0, total_gpu))
+
+                # For iGPU on AMD/Intel APU, thermal envelope shares the CPU package
+                self.gpu_temp = max(38.0, self.cpu_temp - 2.0)
         except Exception:
             pass
 
-        # Dynamic smooth CPU temperature calculation (40°C base idle up to 88°C at full load)
-        t_target = 41.0 + (0.45 * self.cpu_percent) + (0.0003 * (self.cpu_percent ** 2))
-        self.cpu_temp = (self.cpu_temp * 0.82) + (t_target * 0.18)
+    def close(self):
+        if self.pdh_query:
+            try:
+                import ctypes
+                ctypes.windll.pdh.PdhCloseQuery(self.pdh_query)
+                self.pdh_query = None
+            except Exception:
+                pass

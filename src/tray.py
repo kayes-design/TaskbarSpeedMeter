@@ -165,7 +165,7 @@ class SystemTray:
         user32.AppendMenuW(hmenu, MF_STRING | check_flag(config.get("show_net")), CMD_TOGGLE_NET, "⚡ Network Speed (↓ / ↑)")
         user32.AppendMenuW(hmenu, MF_STRING | check_flag(config.get("show_cpu")), CMD_TOGGLE_CPU, "⚙️ CPU Usage (%)")
         user32.AppendMenuW(hmenu, MF_STRING | check_flag(config.get("show_cpu_temp")), CMD_TOGGLE_CPU_TEMP, "🌡️ CPU Temperature (°C)")
-        user32.AppendMenuW(hmenu, MF_STRING | check_flag(config.get("show_gpu")), CMD_TOGGLE_GPU, "🎮 GPU Monitor (Off by default)")
+        user32.AppendMenuW(hmenu, MF_STRING | check_flag(config.get("show_gpu")), CMD_TOGGLE_GPU, "🎮 iGPU / GPU Monitor")
         user32.AppendMenuW(hmenu, MF_STRING | check_flag(config.get("show_ram")), CMD_TOGGLE_RAM, "🧠 RAM Usage (%)")
         user32.AppendMenuW(hmenu, MF_STRING | check_flag(config.get("show_disk")), CMD_TOGGLE_DISK, "💾 Disk Activity (R / W)")
 

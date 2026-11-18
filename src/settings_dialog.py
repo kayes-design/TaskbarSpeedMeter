@@ -267,7 +267,7 @@ class SettingsDialog:
         ttk.Checkbutton(f_mods, text="⚡ Network Speed", variable=self.var_net, command=self._save_config_data).grid(row=0, column=0, sticky='w', padx=10, pady=2)
         ttk.Checkbutton(f_mods, text="⚙️ CPU Usage (%)", variable=self.var_cpu, command=self._save_config_data).grid(row=0, column=1, sticky='w', padx=10, pady=2)
         ttk.Checkbutton(f_mods, text="🌡️ CPU Temperature (°C)", variable=self.var_cpu_temp, command=self._save_config_data).grid(row=1, column=0, sticky='w', padx=10, pady=2)
-        ttk.Checkbutton(f_mods, text="🎮 GPU Usage & Temp (Off by default)", variable=self.var_gpu, command=self._save_config_data).grid(row=1, column=1, sticky='w', padx=10, pady=2)
+        ttk.Checkbutton(f_mods, text="🎮 iGPU / GPU Usage & Temp", variable=self.var_gpu, command=self._save_config_data).grid(row=1, column=1, sticky='w', padx=10, pady=2)
         ttk.Checkbutton(f_mods, text="🧠 RAM Usage (%)", variable=self.var_ram, command=self._save_config_data).grid(row=2, column=0, sticky='w', padx=10, pady=2)
         ttk.Checkbutton(f_mods, text="💾 Disk I/O (R / W)", variable=self.var_disk, command=self._save_config_data).grid(row=2, column=1, sticky='w', padx=10, pady=2)
 

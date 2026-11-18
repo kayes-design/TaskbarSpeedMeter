@@ -675,6 +675,12 @@ class SpeedMeterWindow:
         return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
     def _cleanup(self):
+        if hasattr(self, 'metrics') and self.metrics:
+            try:
+                self.metrics.close()
+            except Exception:
+                pass
+
         if self.tray:
             self.tray.remove()
         user32.KillTimer(self.hwnd, 1)

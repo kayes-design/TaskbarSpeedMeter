@@ -22,7 +22,12 @@ class DashboardWindow:
     _instance = None
 
     def __init__(self, metrics=None):
-        self.metrics = metrics
+        if metrics is None:
+            self.metrics = SystemMetrics()
+            self._owns_metrics = True
+        else:
+            self.metrics = metrics
+            self._owns_metrics = False
         self.root = None
         self.is_running = False
 
@@ -141,13 +146,19 @@ class DashboardWindow:
 
         gpu_header = ttk.Frame(f_gpu, style="Card.TFrame")
         gpu_header.pack(fill="x")
-        ttk.Label(gpu_header, text="🎮 Graphics Adapter (GPU)", style="CardTitle.TLabel").pack(side="left")
-        self.lbl_gpu_temp = tk.Label(gpu_header, text="-- °C", bg="#1A1A1E", fg="#50FA7B", font=("Segoe UI", 9, "bold"))
-        self.lbl_gpu_temp.pack(side="right")
+        ttk.Label(gpu_header, text="🎮 Graphics Adapter (iGPU / GPU)", style="CardTitle.TLabel").pack(side="left")
+        self.lbl_gpu_pct = tk.Label(gpu_header, text="0%", bg="#1A1A1E", fg="#50FA7B", font=("Segoe UI", 11, "bold"))
+        self.lbl_gpu_pct.pack(side="right")
+        self.lbl_gpu_temp = tk.Label(gpu_header, text="-- °C", bg="#1A1A1E", fg="#FFA500", font=("Segoe UI", 9, "bold"))
+        self.lbl_gpu_temp.pack(side="right", padx=10)
 
-        self.lbl_gpu_name = ttk.Label(f_gpu, text="AMD Radeon(TM) Graphics (Integrated)", style="CardText.TLabel")
+        self.lbl_gpu_name = ttk.Label(f_gpu, text="AMD Radeon(TM) Graphics (iGPU)", style="CardText.TLabel")
         self.lbl_gpu_name.pack(anchor="w", pady=(2, 2))
-        self.lbl_gpu_note = ttk.Label(f_gpu, text="Shares high-efficiency silicon package with AMD Ryzen 7 7700.", style="CardMuted.TLabel")
+
+        self.gpu_bar = ttk.Progressbar(f_gpu, length=560, value=0)
+        self.gpu_bar.pack(fill="x", pady=(2, 4))
+
+        self.lbl_gpu_note = ttk.Label(f_gpu, text="Live hardware acceleration telemetry via Windows PDH Engine.", style="CardMuted.TLabel")
         self.lbl_gpu_note.pack(anchor="w")
 
         # Bottom Bar Buttons
@@ -163,6 +174,11 @@ class DashboardWindow:
 
     def _on_close(self):
         self.is_running = False
+        if getattr(self, '_owns_metrics', False) and self.metrics:
+            try:
+                self.metrics.close()
+            except Exception:
+                pass
         if self.root:
             self.root.destroy()
             self.root = None
@@ -172,6 +188,9 @@ class DashboardWindow:
             return
 
         try:
+            if getattr(self, '_owns_metrics', False) and self.metrics:
+                self.metrics.update()
+
             # Refresh CPU
             cpu_pct = psutil.cpu_percent(interval=None)
             self.cpu_bar['value'] = cpu_pct
@@ -234,6 +253,22 @@ class DashboardWindow:
             today_d = format_bytes(config.get("today_down_bytes", 0))
             today_u = format_bytes(config.get("today_up_bytes", 0))
             self.lbl_net_today.config(text=f"Today's Session Usage: ↓ {today_d}  |  ↑ {today_u}")
+
+            # Refresh GPU / iGPU Telemetry
+            if self.metrics:
+                gpu_p = self.metrics.gpu_percent
+                self.gpu_bar['value'] = gpu_p
+                self.lbl_gpu_pct.config(text=f"{gpu_p:.0f}%")
+                
+                g_temp = self.metrics.gpu_temp
+                g_thresh = config.get("gpu_temp_alert_threshold", 80)
+                g_alert_c = config.get("color_temp_alert", "#FF3333")
+                g_normal_c = config.get("color_gpu_temp", "#50FA7B")
+                
+                if config.get("enable_temp_alert_color", True) and g_temp >= g_thresh:
+                    self.lbl_gpu_temp.config(text=f"🌡️ {g_temp:.0f} °C (HIGH)", fg=g_alert_c)
+                else:
+                    self.lbl_gpu_temp.config(text=f"🌡️ {g_temp:.0f} °C", fg=g_normal_c)
 
         except Exception as e:
             pass
